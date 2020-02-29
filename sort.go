@@ -1,10 +1,4 @@
-package sort-tracker
-
-import (
-	"github.com/konimarti/kalman"
-	"github.com/konimarti/lti"
-	"gonum.org/v1/gonum/mat"
-)
+package sort
 
 // filter := kalman.NewFilter(
 // 	X, // initial state (n x 1)
@@ -24,6 +18,3 @@ import (
 // C,  // measurement matrix (l x n)
 // R, // measurement errors (l x l)
 // D,  // measurement matrix (l x k)
-
-
-

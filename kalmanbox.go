@@ -1,4 +1,12 @@
-package sort-tracker
+package sort
+
+type KalmanBoxTracker struct {
+	count int
+}
+
+func NewKalmanBoxTracker(bbox) KalmanBoxTracker {
+	return KalmanBoxTracker{}
+}
 
 // class KalmanBoxTracker(object):
 //   """
