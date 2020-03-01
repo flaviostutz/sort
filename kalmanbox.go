@@ -1,12 +1,166 @@
 package sort
 
+import (
+	"github.com/konimarti/kalman"
+	"github.com/konimarti/lti"
+	"gonum.org/v1/gonum/mat"
+)
+
+//KalmanBoxTracker   This class represents the internel state of individual tracked objects observed as bbox.
 type KalmanBoxTracker struct {
-	count int
+	count           int
+	kf              kalman.Filter
+	ctrl            *mat.VecDense
+	kctx            kalman.Context
+	timeSinceUpdate int
+	id              int64
+	// history         [][]float64
+	bbox      []float64
+	hits      int
+	hitStreak int
+	age       int
 }
 
-func NewKalmanBoxTracker(bbox) KalmanBoxTracker {
-	return KalmanBoxTracker{}
+//NewKalmanBoxTracker     Initialises a tracker using initial bounding box.
+func NewKalmanBoxTracker(bbox []float64) KalmanBoxTracker {
+	//define constant velocity model
+	kf := kalman.NewFilter(
+		lti.Discrete{
+			Ad: mat.NewDense(7, 7, []float64{
+				1, 0, 0, 0, 1, 0, 0,
+				0, 1, 0, 0, 0, 1, 0,
+				0, 0, 1, 0, 0, 0, 1,
+				0, 0, 0, 1, 0, 0, 0,
+				0, 0, 0, 0, 1, 0, 0,
+				0, 0, 0, 0, 0, 1, 0,
+				0, 0, 0, 0, 0, 0, 1}),
+			C: mat.NewDense(4, 7, []float64{
+				1, 0, 0, 0, 0, 0, 0,
+				0, 1, 0, 0, 0, 0, 0,
+				0, 0, 1, 0, 0, 0, 0,
+				0, 0, 0, 1, 0, 0, 0}),
+		},
+		kalman.Noise{
+			Q: mat.NewDense(7, 7, []float64{
+				1, 0, 0, 0, 0, 0, 0,
+				0, 1, 0, 0, 0, 0, 0,
+				0, 0, 1, 0, 0, 0, 0,
+				0, 0, 0, 1, 0, 0, 0,
+				0, 0, 0, 0, 0.01, 0, 0,
+				0, 0, 0, 0, 0, 0.01, 0,
+				0, 0, 0, 0, 0, 0, 0.0001}),
+			R: mat.NewDense(7, 7, []float64{
+				1, 0, 0, 0, 0, 0, 0,
+				0, 1, 0, 0, 0, 0, 0,
+				0, 0, 10, 0, 0, 0, 0,
+				0, 0, 0, 10, 0, 0, 0,
+				0, 0, 0, 0, 10, 0, 0,
+				0, 0, 0, 0, 0, 10, 0,
+				0, 0, 0, 0, 0, 0, 10}),
+		},
+	)
+
+	kctx := kalman.Context{
+		X: mat.NewVecDense(7, []float64{0, 0, 0, 0, 0, 0, 0}),
+		P: mat.NewDense(7, 7, []float64{
+			10, 0, 0, 0, 1, 0, 0,
+			0, 10, 0, 0, 0, 1, 0,
+			0, 0, 10, 0, 0, 0, 1,
+			0, 0, 0, 10, 0, 0, 0,
+			0, 0, 0, 0, 1000, 0, 0,
+			0, 0, 0, 0, 0, 10, 0,
+			0, 0, 0, 0, 0, 0, 10}),
+	}
+	// self.M = np.zeros((dim_z, dim_z)) # process-measurement cross correlation
+	// self.K = np.zeros((dim_x, dim_z)) # kalman gain
+	// self.S = np.zeros((dim_z, dim_z)) # system uncertainty
+	// self.SI = np.zeros((dim_z, dim_z)) # inverse system uncertainty
+
+	ctrl := mat.NewVecDense(4, nil)
+
+	z := mat.NewVecDense(4, convertBBoxToZ(bbox))
+	kf.Apply(&kctx, z, ctrl)
+
+	return KalmanBoxTracker{
+		id:              0,
+		count:           1,
+		kf:              kf,
+		ctrl:            ctrl,
+		kctx:            kctx,
+		timeSinceUpdate: 0,
+		// history:         [][]float64{},
+		hits:      0,
+		hitStreak: 0,
+		age:       0,
+		bbox:      bbox,
+	}
 }
+
+//     Updates the state vector with observed bbox.
+func (k KalmanBoxTracker) update(bbox []float64) {
+	k.timeSinceUpdate = 0
+	// k.history = [][]float64{}
+	k.hits = k.hits + 1
+	k.hitStreak = k.hitStreak + 1
+	k.bbox = bbox
+
+	z := mat.NewVecDense(4, convertBBoxToZ(bbox))
+	k.kf.Apply(&k.kctx, z, k.ctrl)
+}
+
+//     Advances the state vector and returns the predicted bounding box estimate.
+func (k KalmanBoxTracker) predict() []float64 {
+	x := k.kctx.X
+	if x.AtVec(6)+x.AtVec(2) <= 0 {
+		x.SetVec(6, 0.0)
+	}
+	k.age = k.age + 1
+	if k.timeSinceUpdate > 0 {
+		k.hitStreak = 0
+	}
+	k.timeSinceUpdate = k.timeSinceUpdate + 1
+
+	// predBBox := k.getState()
+	// k.history = append(k.history, bbox)
+
+	state := k.kf.State()
+	z := []float64{state.AtVec(0), state.AtVec(1), state.AtVec(2), state.AtVec(3)}
+	return convertZToBBox(z)
+}
+
+//     Returns the current bounding box estimate.
+// func (k KalmanBoxTracker) getState() []float64 {
+// 	state := k.kf.State()
+// 	z := []float64{state.AtVec(0), state.AtVec(1), state.AtVec(2), state.AtVec(3)}
+// 	return convertZToBBox(z)
+// }
+
+// filter := kalman.NewFilter(
+// 	X, // initial state (n x 1)
+// 	P, // initial process covariance (n x n)
+// 	F, // prediction matrix (n x n)
+// 	B, // control matrix (n x k)
+// 	Q, // process model covariance matrix (n x n)
+// 	H, // measurement matrix (l x n)
+// 	R, // measurement errors (l x l)
+// )
+
+// Ad - F
+// Bd - B
+// X - X
+// P - P
+// Q - Q
+// C - H
+// R - R
+
+// X, // initial state (n x 1)
+// P, // initial process covariance (n x n)
+// Ad, // prediction matrix (n x n)
+// Bd, // control matrix (n x k)
+// Q, // process model covariance matrix (n x n)
+// C,  // measurement matrix (l x n)
+// R, // measurement errors (l x l)
+// D,  // measurement matrix (l x k)
 
 // class KalmanBoxTracker(object):
 //   """
