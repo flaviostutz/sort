@@ -1,6 +1,8 @@
 package sort
 
 import (
+	"fmt"
+
 	"github.com/konimarti/kalman"
 	"github.com/konimarti/lti"
 	"gonum.org/v1/gonum/mat"
@@ -22,7 +24,10 @@ type KalmanBoxTracker struct {
 }
 
 //NewKalmanBoxTracker     Initialises a tracker using initial bounding box.
-func NewKalmanBoxTracker(bbox []float64) KalmanBoxTracker {
+func NewKalmanBoxTracker(bbox []float64) (KalmanBoxTracker, error) {
+	if len(bbox) < 4 {
+		return KalmanBoxTracker{}, fmt.Errorf("bbox should contain at least 4 positions: x1,y1,x2,y2")
+	}
 	//define constant velocity model
 	kf := kalman.NewFilter(
 		lti.Discrete{
@@ -34,11 +39,13 @@ func NewKalmanBoxTracker(bbox []float64) KalmanBoxTracker {
 				0, 0, 0, 0, 1, 0, 0,
 				0, 0, 0, 0, 0, 1, 0,
 				0, 0, 0, 0, 0, 0, 1}),
+			Bd: mat.NewDense(7, 7, nil),
 			C: mat.NewDense(4, 7, []float64{
 				1, 0, 0, 0, 0, 0, 0,
 				0, 1, 0, 0, 0, 0, 0,
 				0, 0, 1, 0, 0, 0, 0,
 				0, 0, 0, 1, 0, 0, 0}),
+			D: mat.NewDense(4, 7, nil),
 		},
 		kalman.Noise{
 			Q: mat.NewDense(7, 7, []float64{
@@ -49,14 +56,11 @@ func NewKalmanBoxTracker(bbox []float64) KalmanBoxTracker {
 				0, 0, 0, 0, 0.01, 0, 0,
 				0, 0, 0, 0, 0, 0.01, 0,
 				0, 0, 0, 0, 0, 0, 0.0001}),
-			R: mat.NewDense(7, 7, []float64{
-				1, 0, 0, 0, 0, 0, 0,
-				0, 1, 0, 0, 0, 0, 0,
-				0, 0, 10, 0, 0, 0, 0,
-				0, 0, 0, 10, 0, 0, 0,
-				0, 0, 0, 0, 10, 0, 0,
-				0, 0, 0, 0, 0, 10, 0,
-				0, 0, 0, 0, 0, 0, 10}),
+			R: mat.NewDense(4, 4, []float64{
+				1, 0, 0, 0,
+				0, 1, 0, 0,
+				0, 0, 10, 0,
+				0, 0, 0, 10}),
 		},
 	)
 
@@ -76,7 +80,7 @@ func NewKalmanBoxTracker(bbox []float64) KalmanBoxTracker {
 	// self.S = np.zeros((dim_z, dim_z)) # system uncertainty
 	// self.SI = np.zeros((dim_z, dim_z)) # inverse system uncertainty
 
-	ctrl := mat.NewVecDense(4, nil)
+	ctrl := mat.NewVecDense(7, nil)
 
 	z := mat.NewVecDense(4, convertBBoxToZ(bbox))
 	kf.Apply(&kctx, z, ctrl)
@@ -93,11 +97,14 @@ func NewKalmanBoxTracker(bbox []float64) KalmanBoxTracker {
 		hitStreak: 0,
 		age:       0,
 		bbox:      bbox,
-	}
+	}, nil
 }
 
-//     Updates the state vector with observed bbox.
-func (k KalmanBoxTracker) update(bbox []float64) {
+//Update     Updates the state vector with observed bbox.
+func (k KalmanBoxTracker) Update(bbox []float64) error {
+	if len(bbox) < 4 {
+		return fmt.Errorf("bbox should contain at least 4 positions: x1,y1,x2,y2")
+	}
 	k.timeSinceUpdate = 0
 	// k.history = [][]float64{}
 	k.hits = k.hits + 1
@@ -106,10 +113,12 @@ func (k KalmanBoxTracker) update(bbox []float64) {
 
 	z := mat.NewVecDense(4, convertBBoxToZ(bbox))
 	k.kf.Apply(&k.kctx, z, k.ctrl)
+
+	return nil
 }
 
-//     Advances the state vector and returns the predicted bounding box estimate.
-func (k KalmanBoxTracker) predict() []float64 {
+//Predict     Advances the state vector and returns the predicted bounding box estimate.
+func (k KalmanBoxTracker) Predict() []float64 {
 	x := k.kctx.X
 	if x.AtVec(6)+x.AtVec(2) <= 0 {
 		x.SetVec(6, 0.0)

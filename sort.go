@@ -1,26 +1,27 @@
 package sort
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/flaviostutz/munkres"
 )
 
-//Sort Detection tracking
-type Sort struct {
+//SORT Detection tracking
+type SORT struct {
 	maxAge     int
 	minHits    int
-	trackers   []KalmanBoxTracker
-	frameCount int
+	Trackers   []KalmanBoxTracker
+	FrameCount int
 }
 
 //NewSort initializes a new SORT tracking session
-func NewSort(maxAge int, minHits int) Sort {
-	return Sort{
+func NewSORT(maxAge int, minHits int) SORT {
+	return SORT{
 		maxAge:     maxAge,
 		minHits:    minHits,
-		trackers:   make([]KalmanBoxTracker, 0),
-		frameCount: 0,
+		Trackers:   make([]KalmanBoxTracker, 0),
+		FrameCount: 0,
 	}
 }
 
@@ -30,12 +31,12 @@ func NewSort(maxAge int, minHits int) Sort {
 //     Requires: this method must be called once for each frame even with empty detections.
 //     Returns the a similar array, where the last column is the object ID.
 //     NOTE: The number of objects returned may differ from the number of detections provided.
-func (s Sort) Update(dets [][]float64, iouThreshold float64) {
-	s.frameCount = s.frameCount + 1
+func (s SORT) Update(dets [][]float64, iouThreshold float64) error {
+	s.FrameCount = s.FrameCount + 1
 
 	//NOT SURE HOW KALMAN ALGO WILL SHOW ERRORS. SEE LATER AND REMOVE INVALID PREDICTORS
 	trks := make([]KalmanBoxTracker, 0)
-	for _, v := range s.trackers {
+	for _, v := range s.Trackers {
 		trks = append(trks, v)
 	}
 	// get predicted locations from existing trackers.
@@ -54,12 +55,15 @@ func (s Sort) Update(dets [][]float64, iouThreshold float64) {
 	matched, unmatchedDets, unmatchedTrks := associateDetectionsToTrackers(dets, trks, iouThreshold)
 
 	// update matched trackers with assigned detections
-	for t, tracker := range s.trackers {
+	for t, tracker := range s.Trackers {
 		//is this tracker still matched?
 		if !contains(unmatchedTrks, int64(t)) {
 			for _, det := range matched {
 				if det[1] == int64(t) {
-					tracker.update(dets[det[0]])
+					err := tracker.Update(dets[det[0]])
+					if err != nil {
+						return err
+					}
 					break
 				}
 			}
@@ -70,20 +74,27 @@ func (s Sort) Update(dets [][]float64, iouThreshold float64) {
 
 	// create and initialise new trackers for unmatched detections
 	for _, udet := range unmatchedDets {
-		trk := NewKalmanBoxTracker(dets[udet])
-		s.trackers = append(s.trackers, trk)
+		trk, err := NewKalmanBoxTracker(dets[udet])
+		if err != nil {
+			return err
+		}
+		s.Trackers = append(s.Trackers, trk)
+		fmt.Printf("New tracker added. bbox=%v\n", trk.bbox)
 	}
 
 	//remove dead trackers
-	ti := len(s.trackers)
+	ti := len(s.Trackers)
 	for t := ti - 1; t >= 0; t-- {
-		trk := s.trackers[t]
+		trk := s.Trackers[t]
 		//         if((trk.time_since_update < 1) and (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits)):
 		//           ret.append(np.concatenate((d,[trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
 		if trk.timeSinceUpdate > s.maxAge {
-			s.trackers = append(s.trackers[:t], s.trackers[t+1:]...)
+			s.Trackers = append(s.Trackers[:t], s.Trackers[t+1:]...)
 		}
+		fmt.Printf("Tracker removed. bbox=%v\n", trk.bbox)
 	}
+
+	return nil
 }
 
 func contains(list []int64, value int64) bool {
@@ -120,7 +131,7 @@ func associateDetectionsToTrackers(detections [][]float64, trackers []KalmanBoxT
 		for t := int64(0); t < lt; t++ {
 			// iouMatrix[d][t] = iou(detections[d], trackers[t].getState())
 			// v := iou(detections[d], trackers[t].getState())
-			v := iou(detections[d], trackers[t].predict())
+			v := iou(detections[d], trackers[t].Predict())
 			mm.SetElement(int64(d), int64(t), v)
 		}
 	}
