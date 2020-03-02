@@ -1,7 +1,6 @@
 package sort
 
 import (
-	"fmt"
 	"math"
 )
 
@@ -15,9 +14,12 @@ func iou(bbtest []float64, bbgt []float64) float64 {
 	h := math.Max(0., yy2-yy1)
 	wh := w * h
 
-	o := wh / ((bbtest[2]-bbtest[0])*(bbtest[3]-bbtest[1]) + (bbgt[2]-bbgt[0])*(bbgt[3]-bbgt[1]) - wh)
-	// o := wh / ((bbtest[2]-bbtest[0])*(bbtest[3]-bbtest[1]) + (bbgt[2]-bbgt[0])*(bbgt[3]-bbgt[1]))
-	fmt.Printf("IOU bbtest=%v bbgt=%v o=%f\n", bbtest, bbgt, o)
+	// o := wh / ((bbtest[2]-bbtest[0])*(bbtest[3]-bbtest[1]) + (bbgt[2]-bbgt[0])*(bbgt[3]-bbgt[1]) - wh)
+	o := wh / ((bbtest[2]-bbtest[0])*(bbtest[3]-bbtest[1]) + (bbgt[2]-bbgt[0])*(bbgt[3]-bbgt[1]))
+	// fmt.Printf("IOU bbtest=%v bbgt=%v o=%f\n", bbtest, bbgt, o)
+	if math.IsNaN(o) {
+		o = 0
+	}
 	return o
 }
 

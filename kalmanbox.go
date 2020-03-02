@@ -20,7 +20,7 @@ type KalmanBoxTracker struct {
 	PredictsSinceUpdate   int
 	UpdatesWithoutPredict int
 	LastBBox              []float64
-	// history         [][]float64
+	// history               [][]float64
 	kf   kalman.Filter
 	ctrl *mat.VecDense
 	kctx *kalman.Context
@@ -90,7 +90,7 @@ func NewKalmanBoxTracker(bbox []float64) (KalmanBoxTracker, error) {
 
 	lastID = lastID + 1
 
-	return KalmanBoxTracker{
+	kbt := KalmanBoxTracker{
 		ID:                    lastID,
 		Updates:               0,
 		UpdatesWithoutPredict: 0,
@@ -100,8 +100,12 @@ func NewKalmanBoxTracker(bbox []float64) (KalmanBoxTracker, error) {
 		kf:                    kf,
 		ctrl:                  ctrl,
 		kctx:                  &kctx,
-		// history:         [][]float64{},
-	}, nil
+		// history:               [][]float64{},
+	}
+
+	kbt.Update(bbox)
+
+	return kbt, nil
 }
 
 //Update     Updates the state vector with observed bbox.
@@ -131,9 +135,14 @@ func (k *KalmanBoxTracker) PredictNext() []float64 {
 	if k.PredictsSinceUpdate > 0 {
 		k.UpdatesWithoutPredict = 0
 	}
+
+	//use auto prediction made during "Apply()" for the first predict request
+	state := x
+	if k.PredictsSinceUpdate > 0 {
+		state = k.kf.PredictState(k.kctx, k.ctrl)
+	}
 	k.PredictsSinceUpdate = k.PredictsSinceUpdate + 1
 
-	state := k.kf.PredictState(k.kctx, k.ctrl)
 	z := []float64{state.AtVec(0), state.AtVec(1), state.AtVec(2), state.AtVec(3)}
 	// k.history = append(k.history, bbox)
 	return convertZToBBox(z)
@@ -145,6 +154,21 @@ func (k *KalmanBoxTracker) CurrentState() []float64 {
 	z := []float64{state.AtVec(0), state.AtVec(1), state.AtVec(2), state.AtVec(3)}
 	return convertZToBBox(z)
 }
+
+//CurrentPrediction get last prediction results
+func (k *KalmanBoxTracker) CurrentPrediction() []float64 {
+	state := k.kctx.X
+	z := []float64{state.AtVec(0), state.AtVec(1), state.AtVec(2), state.AtVec(3)}
+	return convertZToBBox(z)
+}
+
+//GetReferenceBBox gets a predicted bbox if enough updates were applied to this box or just the last applied bbox
+// func (k *KalmanBoxTracker) GetReferenceBBox() []float64 {
+// 	if k.Updates < k.usePredictUpdates {
+// 		return k.LastBBox
+// 	}
+// 	return k.PredictNext()
+// }
 
 // filter := kalman.NewFilter(
 // 	X, // initial state (n x 1)
