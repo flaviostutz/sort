@@ -9,19 +9,21 @@ import (
 
 //SORT Detection tracking
 type SORT struct {
-	maxAge     int
-	minHits    int
-	Trackers   []KalmanBoxTracker
-	FrameCount int
+	maxPredictsWithoutUpdate int
+	minUpdates               int
+	iouThreshold             float64
+	Trackers                 []KalmanBoxTracker
+	FrameCount               int
 }
 
-//NewSort initializes a new SORT tracking session
-func NewSORT(maxAge int, minHits int) SORT {
+//NewSORT initializes a new SORT tracking session
+func NewSORT(maxPredictsWithoutUpdate int, minUpdates int, iouThreshold float64) SORT {
 	return SORT{
-		maxAge:     maxAge,
-		minHits:    minHits,
-		Trackers:   make([]KalmanBoxTracker, 0),
-		FrameCount: 0,
+		maxPredictsWithoutUpdate: maxPredictsWithoutUpdate,
+		minUpdates:               minUpdates,
+		iouThreshold:             iouThreshold,
+		Trackers:                 make([]KalmanBoxTracker, 0),
+		FrameCount:               0,
 	}
 }
 
@@ -31,7 +33,7 @@ func NewSORT(maxAge int, minHits int) SORT {
 //     Requires: this method must be called once for each frame even with empty detections.
 //     Returns the a similar array, where the last column is the object ID.
 //     NOTE: The number of objects returned may differ from the number of detections provided.
-func (s SORT) Update(dets [][]float64, iouThreshold float64) error {
+func (s *SORT) Update(dets [][]float64, iouThreshold float64) error {
 	s.FrameCount = s.FrameCount + 1
 
 	//NOT SURE HOW KALMAN ALGO WILL SHOW ERRORS. SEE LATER AND REMOVE INVALID PREDICTORS
@@ -52,7 +54,11 @@ func (s SORT) Update(dets [][]float64, iouThreshold float64) error {
 	//     for t in reversed(to_del):
 	//       self.trackers.pop(t)
 
-	matched, unmatchedDets, unmatchedTrks := associateDetectionsToTrackers(dets, trks, iouThreshold)
+	matched, unmatchedDets, unmatchedTrks := associateDetectionsToTrackers(dets, trks, s.iouThreshold, s.minUpdates)
+
+	fmt.Printf("matched: %v\n", matched)
+	fmt.Printf("unmatchedDets: %v\n", unmatchedDets)
+	fmt.Printf("unmatchedTrks: %v\n", unmatchedTrks)
 
 	// update matched trackers with assigned detections
 	for t, tracker := range s.Trackers {
@@ -79,7 +85,7 @@ func (s SORT) Update(dets [][]float64, iouThreshold float64) error {
 			return err
 		}
 		s.Trackers = append(s.Trackers, trk)
-		fmt.Printf("New tracker added. bbox=%v\n", trk.bbox)
+		fmt.Printf("New tracker added. bbox=%v\n", trk.LastBBox)
 	}
 
 	//remove dead trackers
@@ -88,10 +94,10 @@ func (s SORT) Update(dets [][]float64, iouThreshold float64) error {
 		trk := s.Trackers[t]
 		//         if((trk.time_since_update < 1) and (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits)):
 		//           ret.append(np.concatenate((d,[trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
-		if trk.timeSinceUpdate > s.maxAge {
+		if trk.PredictsSinceUpdate > s.maxPredictsWithoutUpdate {
 			s.Trackers = append(s.Trackers[:t], s.Trackers[t+1:]...)
+			fmt.Printf("Tracker removed. bbox=%v\n", trk.LastBBox)
 		}
-		fmt.Printf("Tracker removed. bbox=%v\n", trk.bbox)
 	}
 
 	return nil
@@ -110,7 +116,7 @@ func contains(list []int64, value int64) bool {
 
 //   Assigns detections to tracked object (both represented as bounding boxes)
 //   Returns 3 lists of indexes: matches, unmatched_detections and unmatched_trackers
-func associateDetectionsToTrackers(detections [][]float64, trackers []KalmanBoxTracker, iouThreshold float64) ([][]int64, []int64, []int64) {
+func associateDetectionsToTrackers(detections [][]float64, trackers []KalmanBoxTracker, iouThreshold float64, minUpdates int) ([][]int64, []int64, []int64) {
 	if len(trackers) == 0 {
 		det := make([]int64, 0)
 		for i := range detections {
@@ -131,7 +137,15 @@ func associateDetectionsToTrackers(detections [][]float64, trackers []KalmanBoxT
 		for t := int64(0); t < lt; t++ {
 			// iouMatrix[d][t] = iou(detections[d], trackers[t].getState())
 			// v := iou(detections[d], trackers[t].getState())
-			v := iou(detections[d], trackers[t].Predict())
+			tbbox := []float64{}
+			if trackers[t].Updates < minUpdates {
+				fmt.Printf("NO PREDICT(). FEW SAMPLES.")
+				tbbox = trackers[t].LastBBox
+			} else {
+				fmt.Printf("PREDICT!")
+				tbbox = trackers[t].PredictNext()
+			}
+			v := iou(detections[d], tbbox)
 			mm.SetElement(int64(d), int64(t), v)
 		}
 	}

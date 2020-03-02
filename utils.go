@@ -1,6 +1,7 @@
 package sort
 
 import (
+	"fmt"
 	"math"
 )
 
@@ -16,6 +17,7 @@ func iou(bbtest []float64, bbgt []float64) float64 {
 
 	o := wh / ((bbtest[2]-bbtest[0])*(bbtest[3]-bbtest[1]) + (bbgt[2]-bbgt[0])*(bbgt[3]-bbgt[1]) - wh)
 	// o := wh / ((bbtest[2]-bbtest[0])*(bbtest[3]-bbtest[1]) + (bbgt[2]-bbgt[0])*(bbgt[3]-bbgt[1]))
+	fmt.Printf("IOU bbtest=%v bbgt=%v o=%f\n", bbtest, bbgt, o)
 	return o
 }
 

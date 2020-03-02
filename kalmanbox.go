@@ -3,24 +3,27 @@ package sort
 import (
 	"fmt"
 
-	"github.com/konimarti/kalman"
+	"github.com/flaviostutz/kalman"
 	"github.com/konimarti/lti"
 	"gonum.org/v1/gonum/mat"
 )
 
+var (
+	lastID = int64(0)
+)
+
 //KalmanBoxTracker   This class represents the internel state of individual tracked objects observed as bbox.
 type KalmanBoxTracker struct {
-	count           int
-	kf              kalman.Filter
-	ctrl            *mat.VecDense
-	kctx            kalman.Context
-	timeSinceUpdate int
-	id              int64
+	ID                    int64
+	Updates               int
+	Predicts              int
+	PredictsSinceUpdate   int
+	UpdatesWithoutPredict int
+	LastBBox              []float64
 	// history         [][]float64
-	bbox      []float64
-	hits      int
-	hitStreak int
-	age       int
+	kf   kalman.Filter
+	ctrl *mat.VecDense
+	kctx *kalman.Context
 }
 
 //NewKalmanBoxTracker     Initialises a tracker using initial bounding box.
@@ -85,64 +88,63 @@ func NewKalmanBoxTracker(bbox []float64) (KalmanBoxTracker, error) {
 	z := mat.NewVecDense(4, convertBBoxToZ(bbox))
 	kf.Apply(&kctx, z, ctrl)
 
+	lastID = lastID + 1
+
 	return KalmanBoxTracker{
-		id:              0,
-		count:           1,
-		kf:              kf,
-		ctrl:            ctrl,
-		kctx:            kctx,
-		timeSinceUpdate: 0,
+		ID:                    lastID,
+		Updates:               0,
+		UpdatesWithoutPredict: 0,
+		Predicts:              0,
+		PredictsSinceUpdate:   0,
+		LastBBox:              bbox,
+		kf:                    kf,
+		ctrl:                  ctrl,
+		kctx:                  &kctx,
 		// history:         [][]float64{},
-		hits:      0,
-		hitStreak: 0,
-		age:       0,
-		bbox:      bbox,
 	}, nil
 }
 
 //Update     Updates the state vector with observed bbox.
-func (k KalmanBoxTracker) Update(bbox []float64) error {
+func (k *KalmanBoxTracker) Update(bbox []float64) error {
 	if len(bbox) < 4 {
 		return fmt.Errorf("bbox should contain at least 4 positions: x1,y1,x2,y2")
 	}
-	k.timeSinceUpdate = 0
+	k.PredictsSinceUpdate = 0
 	// k.history = [][]float64{}
-	k.hits = k.hits + 1
-	k.hitStreak = k.hitStreak + 1
-	k.bbox = bbox
+	k.Updates = k.Updates + 1
+	k.UpdatesWithoutPredict = k.UpdatesWithoutPredict + 1
+	k.LastBBox = bbox
 
 	z := mat.NewVecDense(4, convertBBoxToZ(bbox))
-	k.kf.Apply(&k.kctx, z, k.ctrl)
+	k.kf.Apply(k.kctx, z, k.ctrl)
 
 	return nil
 }
 
-//Predict     Advances the state vector and returns the predicted bounding box estimate.
-func (k KalmanBoxTracker) Predict() []float64 {
+//PredictNext     Advances the state vector and returns the predicted bounding box estimate.
+func (k *KalmanBoxTracker) PredictNext() []float64 {
 	x := k.kctx.X
 	if x.AtVec(6)+x.AtVec(2) <= 0 {
 		x.SetVec(6, 0.0)
 	}
-	k.age = k.age + 1
-	if k.timeSinceUpdate > 0 {
-		k.hitStreak = 0
+	k.Predicts = k.Predicts + 1
+	if k.PredictsSinceUpdate > 0 {
+		k.UpdatesWithoutPredict = 0
 	}
-	k.timeSinceUpdate = k.timeSinceUpdate + 1
+	k.PredictsSinceUpdate = k.PredictsSinceUpdate + 1
 
-	// predBBox := k.getState()
-	// k.history = append(k.history, bbox)
-
-	state := k.kf.State()
+	state := k.kf.PredictState(k.kctx, k.ctrl)
 	z := []float64{state.AtVec(0), state.AtVec(1), state.AtVec(2), state.AtVec(3)}
+	// k.history = append(k.history, bbox)
 	return convertZToBBox(z)
 }
 
-//     Returns the current bounding box estimate.
-// func (k KalmanBoxTracker) getState() []float64 {
-// 	state := k.kf.State()
-// 	z := []float64{state.AtVec(0), state.AtVec(1), state.AtVec(2), state.AtVec(3)}
-// 	return convertZToBBox(z)
-// }
+//CurrentState Returns the current bounding box estimate.
+func (k *KalmanBoxTracker) CurrentState() []float64 {
+	state := k.kf.CurrentState()
+	z := []float64{state.AtVec(0), state.AtVec(1), state.AtVec(2), state.AtVec(3)}
+	return convertZToBBox(z)
+}
 
 // filter := kalman.NewFilter(
 // 	X, // initial state (n x 1)

@@ -25,10 +25,15 @@ func main() {
 	bt.Update([]float64{3, 3, 5, 5})
 	bt.Update([]float64{4, 4, 6, 6})
 	bt.Update([]float64{5, 5, 7, 7})
-	fmt.Printf("predicted=%v\n", bt.Predict())
+	bt.Update([]float64{6, 6, 8, 8})
+	bt.Update([]float64{7, 7, 9, 9})
+	fmt.Printf("predicted1=%v\n", bt.PredictNext())
+	fmt.Printf("predicted2=%v\n", bt.PredictNext())
+	fmt.Printf("predicted3=%v\n", bt.PredictNext())
+	fmt.Printf("PredictsSinceUpdate=%d\n", bt.PredictsSinceUpdate)
 
 	fmt.Printf("Test SORT\n")
-	s := sort.NewSORT(5, 1)
+	s := sort.NewSORT(5, 4, 0.3)
 
 	fmt.Printf("111\n")
 	b := [][]float64{
@@ -59,7 +64,40 @@ func main() {
 	fmt.Printf("555\n")
 	b = [][]float64{
 		[]float64{23, 23, 23, 23},
+		[]float64{30, 30, 30, 30},
 		[]float64{5, 5, 7, 7},
+	}
+	s.Update(b, 0.3)
+
+	fmt.Printf("666\n")
+	b = [][]float64{
+		[]float64{6, 6, 8, 8},
+		[]float64{23, 23, 23, 23},
+		[]float64{40, 40, 40, 40},
+	}
+	s.Update(b, 0.3)
+
+	fmt.Printf("777\n")
+	b = [][]float64{
+		[]float64{7, 7, 9, 9},
+		[]float64{23, 23, 23, 23},
+		[]float64{50, 50, 50, 50},
+	}
+	s.Update(b, 0.3)
+
+	fmt.Printf("888\n")
+	b = [][]float64{
+		[]float64{8, 8, 10, 10},
+		[]float64{24, 24, 24, 24},
+		[]float64{60, 60, 60, 60},
+	}
+	s.Update(b, 0.3)
+
+	fmt.Printf("999\n")
+	b = [][]float64{
+		[]float64{9, 9, 11, 11},
+		[]float64{23, 23, 23, 23},
+		[]float64{70, 70, 70, 70},
 	}
 	s.Update(b, 0.3)
 
