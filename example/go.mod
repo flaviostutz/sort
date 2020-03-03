@@ -11,4 +11,4 @@ require (
 
 replace github.com/flaviostutz/sort => ../
 
-replace github.com/flaviostutz/kalman => ../../kalman
+// replace github.com/flaviostutz/kalman => ../../kalman
