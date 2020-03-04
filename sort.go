@@ -35,8 +35,8 @@ func NewSORT(maxPredictsWithoutUpdate int, minUpdatesUsePrediction int, iouThres
 //     Requires: this method must be called once for each frame even with empty detections.
 //     Returns the a similar array, where the last column is the object ID.
 //     NOTE: The number of objects returned may differ from the number of detections provided.
-func (s *SORT) Update(dets [][]float64, iouThreshold float64) error {
-	logrus.Debugf("SORT Update dets=%v iouThreshold=%f", dets, iouThreshold)
+func (s *SORT) Update(dets [][]float64) error {
+	logrus.Debugf("SORT Update dets=%v iouThreshold=%f", dets, s.iouThreshold)
 	s.FrameCount = s.FrameCount + 1
 
 	//NOT SURE HOW KALMAN ALGO WILL SHOW ERRORS. SEE LATER AND REMOVE INVALID PREDICTORS
