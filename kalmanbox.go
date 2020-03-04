@@ -19,7 +19,9 @@ type KalmanBoxTracker struct {
 	Predicts              int
 	PredictsSinceUpdate   int
 	UpdatesWithoutPredict int
+	SkipPredicts          int
 	LastBBox              []float64
+	LastBBoxIOU           []float64
 	// history               [][]float64
 	kf   kalman.Filter
 	ctrl *mat.VecDense
@@ -120,6 +122,7 @@ func (k *KalmanBoxTracker) Update(bbox []float64) error {
 	k.LastBBox = bbox
 
 	z := mat.NewVecDense(4, convertBBoxToZ(bbox))
+
 	k.kf.Apply(k.kctx, z, k.ctrl)
 
 	return nil
@@ -127,6 +130,7 @@ func (k *KalmanBoxTracker) Update(bbox []float64) error {
 
 //PredictNext     Advances the state vector and returns the predicted bounding box estimate.
 func (k *KalmanBoxTracker) PredictNext() []float64 {
+	k.SkipPredicts = 0
 	x := k.kctx.X
 	if x.AtVec(6)+x.AtVec(2) <= 0 {
 		x.SetVec(6, 0.0)
@@ -157,18 +161,11 @@ func (k *KalmanBoxTracker) CurrentState() []float64 {
 
 //CurrentPrediction get last prediction results
 func (k *KalmanBoxTracker) CurrentPrediction() []float64 {
+	k.SkipPredicts = 0
 	state := k.kctx.X
 	z := []float64{state.AtVec(0), state.AtVec(1), state.AtVec(2), state.AtVec(3)}
 	return convertZToBBox(z)
 }
-
-//GetReferenceBBox gets a predicted bbox if enough updates were applied to this box or just the last applied bbox
-// func (k *KalmanBoxTracker) GetReferenceBBox() []float64 {
-// 	if k.Updates < k.usePredictUpdates {
-// 		return k.LastBBox
-// 	}
-// 	return k.PredictNext()
-// }
 
 // filter := kalman.NewFilter(
 // 	X, // initial state (n x 1)
@@ -196,62 +193,3 @@ func (k *KalmanBoxTracker) CurrentPrediction() []float64 {
 // C,  // measurement matrix (l x n)
 // R, // measurement errors (l x l)
 // D,  // measurement matrix (l x k)
-
-// class KalmanBoxTracker(object):
-//   """
-//   This class represents the internel state of individual tracked objects observed as bbox.
-//   """
-//   count = 0
-//   def __init__(self,bbox):
-//     """
-//     Initialises a tracker using initial bounding box.
-//     """
-//     #define constant velocity model
-//     self.kf = KalmanFilter(dim_x=7, dim_z=4)
-//     self.kf.F = np.array([[1,0,0,0,1,0,0],[0,1,0,0,0,1,0],[0,0,1,0,0,0,1],[0,0,0,1,0,0,0],  [0,0,0,0,1,0,0],[0,0,0,0,0,1,0],[0,0,0,0,0,0,1]])
-//     self.kf.H = np.array([[1,0,0,0,0,0,0],[0,1,0,0,0,0,0],[0,0,1,0,0,0,0],[0,0,0,1,0,0,0]])
-
-//     self.kf.R[2:,2:] *= 10.
-//     self.kf.P[4:,4:] *= 1000. #give high uncertainty to the unobservable initial velocities
-//     self.kf.P *= 10.
-//     self.kf.Q[-1,-1] *= 0.01
-//     self.kf.Q[4:,4:] *= 0.01
-
-//     self.kf.x[:4] = convert_bbox_to_z(bbox)
-//     self.time_since_update = 0
-//     self.id = KalmanBoxTracker.count
-//     KalmanBoxTracker.count += 1
-//     self.history = []
-//     self.hits = 0
-//     self.hit_streak = 0
-//     self.age = 0
-
-//   def update(self,bbox):
-//     """
-//     Updates the state vector with observed bbox.
-//     """
-//     self.time_since_update = 0
-//     self.history = []
-//     self.hits += 1
-//     self.hit_streak += 1
-//     self.kf.update(convert_bbox_to_z(bbox))
-
-//   def predict(self):
-//     """
-//     Advances the state vector and returns the predicted bounding box estimate.
-//     """
-//     if((self.kf.x[6]+self.kf.x[2])<=0):
-//       self.kf.x[6] *= 0.0
-//     self.kf.predict()
-//     self.age += 1
-//     if(self.time_since_update>0):
-//       self.hit_streak = 0
-//     self.time_since_update += 1
-//     self.history.append(convert_x_to_bbox(self.kf.x))
-//     return self.history[-1]
-
-//   def get_state(self):
-//     """
-//     Returns the current bounding box estimate.
-//     """
-//     return convert_x_to_bbox(self.kf.x)
