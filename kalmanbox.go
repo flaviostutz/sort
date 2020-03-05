@@ -23,9 +23,9 @@ type KalmanBoxTracker struct {
 	LastBBox              []float64
 	LastBBoxIOU           []float64
 	// history               [][]float64
-	kf   kalman.Filter
-	ctrl *mat.VecDense
-	kctx *kalman.Context
+	KalmanFilter kalman.Filter
+	KalmanCtrl   *mat.VecDense
+	KalmanCtx    *kalman.Context
 }
 
 //NewKalmanBoxTracker     Initialises a tracker using initial bounding box.
@@ -99,13 +99,13 @@ func NewKalmanBoxTracker(bbox []float64) (KalmanBoxTracker, error) {
 		Predicts:              0,
 		PredictsSinceUpdate:   0,
 		LastBBox:              bbox,
-		kf:                    kf,
-		ctrl:                  ctrl,
-		kctx:                  &kctx,
+		KalmanFilter:          kf,
+		KalmanCtrl:            ctrl,
+		KalmanCtx:             &kctx,
 		// history:               [][]float64{},
 	}
 
-	kbt.Update(bbox)
+	// kbt.Update(bbox)
 
 	return kbt, nil
 }
@@ -123,7 +123,7 @@ func (k *KalmanBoxTracker) Update(bbox []float64) error {
 
 	z := mat.NewVecDense(4, convertBBoxToZ(bbox))
 
-	k.kf.Apply(k.kctx, z, k.ctrl)
+	k.KalmanFilter.Apply(k.KalmanCtx, z, k.KalmanCtrl)
 
 	return nil
 }
@@ -131,7 +131,7 @@ func (k *KalmanBoxTracker) Update(bbox []float64) error {
 //PredictNext     Advances the state vector and returns the predicted bounding box estimate.
 func (k *KalmanBoxTracker) PredictNext() []float64 {
 	k.SkipPredicts = 0
-	x := k.kctx.X
+	x := k.KalmanCtx.X
 	if x.AtVec(6)+x.AtVec(2) <= 0 {
 		x.SetVec(6, 0.0)
 	}
@@ -143,7 +143,7 @@ func (k *KalmanBoxTracker) PredictNext() []float64 {
 	//use auto prediction made during "Apply()" for the first predict request
 	state := x
 	if k.PredictsSinceUpdate > 0 {
-		state = k.kf.PredictState(k.kctx, k.ctrl)
+		state = k.KalmanFilter.PredictState(k.KalmanCtx, k.KalmanCtrl)
 	}
 	k.PredictsSinceUpdate = k.PredictsSinceUpdate + 1
 
@@ -154,7 +154,7 @@ func (k *KalmanBoxTracker) PredictNext() []float64 {
 
 //CurrentState Returns the current bounding box estimate.
 func (k *KalmanBoxTracker) CurrentState() []float64 {
-	state := k.kf.CurrentState()
+	state := k.KalmanFilter.CurrentState()
 	z := []float64{state.AtVec(0), state.AtVec(1), state.AtVec(2), state.AtVec(3)}
 	return convertZToBBox(z)
 }
@@ -162,7 +162,7 @@ func (k *KalmanBoxTracker) CurrentState() []float64 {
 //CurrentPrediction get last prediction results
 func (k *KalmanBoxTracker) CurrentPrediction() []float64 {
 	k.SkipPredicts = 0
-	state := k.kctx.X
+	state := k.KalmanCtx.X
 	z := []float64{state.AtVec(0), state.AtVec(1), state.AtVec(2), state.AtVec(3)}
 	return convertZToBBox(z)
 }
