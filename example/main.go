@@ -43,7 +43,7 @@ func main() {
 		[]float64{1, 1, 4, 4},
 		[]float64{100, 100, 120, 120},
 	}
-	s.Update(b, 0.3)
+	s.Update(b)
 
 	fmt.Printf("\n\n22222222222222\n")
 	b = [][]float64{
@@ -51,21 +51,21 @@ func main() {
 		[]float64{2, 2, 5, 5},
 		[]float64{10, 10, 30, 30},
 	}
-	s.Update(b, 0.3)
+	s.Update(b)
 
 	fmt.Printf("\n\n333333333333333\n")
 	b = [][]float64{
 		[]float64{3, 3, 6, 6},
 		[]float64{120, 120, 140, 140},
 	}
-	s.Update(b, 0.3)
+	s.Update(b)
 
 	fmt.Printf("\n\n4444444444444444\n")
 	b = [][]float64{
 		[]float64{130, 130, 150, 150},
 		[]float64{4, 4, 7, 7},
 	}
-	s.Update(b, 0.3)
+	s.Update(b)
 
 	fmt.Printf("\n\n55555555555555555\n")
 	b = [][]float64{
@@ -73,7 +73,7 @@ func main() {
 		[]float64{30, 30, 30, 30},
 		[]float64{5, 5, 8, 8},
 	}
-	s.Update(b, 0.3)
+	s.Update(b)
 
 	fmt.Printf("\n\n666666666666666\n")
 	b = [][]float64{
@@ -81,7 +81,7 @@ func main() {
 		[]float64{23, 23, 23, 23},
 		[]float64{40, 40, 60, 60},
 	}
-	s.Update(b, 0.3)
+	s.Update(b)
 
 	fmt.Printf("\n\n7777777777777777777\n")
 	b = [][]float64{
@@ -90,7 +90,7 @@ func main() {
 		[]float64{23, 23, 23, 23},
 		[]float64{50, 50, 70, 70},
 	}
-	s.Update(b, 0.3)
+	s.Update(b)
 
 	fmt.Printf("\n\n88888888888888888\n")
 	b = [][]float64{
@@ -99,7 +99,7 @@ func main() {
 		[]float64{170, 170, 190, 190},
 		[]float64{60, 60, 80, 80},
 	}
-	s.Update(b, 0.3)
+	s.Update(b)
 
 	fmt.Printf("\n\n99999999999999999\n")
 	b = [][]float64{
@@ -107,7 +107,7 @@ func main() {
 		[]float64{23, 23, 23, 23},
 		[]float64{70, 70, 90, 90},
 	}
-	s.Update(b, 0.3)
+	s.Update(b)
 
 }
 

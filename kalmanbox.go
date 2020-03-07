@@ -23,9 +23,10 @@ type KalmanBoxTracker struct {
 	LastBBox              []float64
 	LastBBoxIOU           []float64
 	// history               [][]float64
-	KalmanFilter kalman.Filter
-	KalmanCtrl   *mat.VecDense
-	KalmanCtx    *kalman.Context
+	LastResiduals []float64
+	KalmanFilter  kalman.Filter
+	KalmanCtrl    *mat.VecDense
+	KalmanCtx     *kalman.Context
 }
 
 //NewKalmanBoxTracker     Initialises a tracker using initial bounding box.
@@ -102,6 +103,7 @@ func NewKalmanBoxTracker(bbox []float64) (KalmanBoxTracker, error) {
 		KalmanFilter:          kf,
 		KalmanCtrl:            ctrl,
 		KalmanCtx:             &kctx,
+		LastResiduals:         []float64{-1, -1, -1, -1},
 		// history:               [][]float64{},
 	}
 
@@ -114,7 +116,7 @@ func NewKalmanBoxTracker(bbox []float64) (KalmanBoxTracker, error) {
 //Returns the residuals that is the difference between the real value (bbox) and the predicted value
 func (k *KalmanBoxTracker) Update(bbox []float64) ([]float64, error) {
 	if len(bbox) < 4 {
-		return fmt.Errorf("bbox should contain at least 4 positions: x1,y1,x2,y2")
+		return []float64{}, fmt.Errorf("bbox should contain at least 4 positions: x1,y1,x2,y2")
 	}
 	k.PredictsSinceUpdate = 0
 	// k.history = [][]float64{}

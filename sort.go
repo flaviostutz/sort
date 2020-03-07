@@ -68,7 +68,7 @@ func (s *SORT) Update(dets [][]float64) error {
 			for _, det := range matched {
 				if det[1] == t {
 					bbox := dets[det[0]]
-					err := tracker.Update(bbox)
+					_, err := tracker.Update(bbox)
 					if err != nil {
 						return err
 					}
